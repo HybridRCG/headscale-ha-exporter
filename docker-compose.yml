@@ -1,0 +1,16 @@
+services:
+  headscale-exporter:
+    build: .
+    image: headscale-exporter:latest
+    container_name: headscale-exporter
+    restart: always
+    environment:
+      PYTHONUNBUFFERED: "1"
+    networks:
+      - headscale_network
+    env_file:
+      - .env
+networks:
+  headscale_network:
+    external: true
+    name: headscale_headscale_default
