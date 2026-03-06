@@ -149,3 +149,26 @@ A ready-made Lovelace dashboard card is available in [DASHBOARD.md](DASHBOARD.md
 ## License
 
 MIT
+
+## Health Check
+
+The exporter exposes a health check endpoint on port `8099` (configurable via `HEALTH_PORT`):
+```bash
+curl http://your-vps-ip:8099/health
+```
+
+Returns:
+```json
+{
+  "status": "ok",
+  "version": "0.2.1-beta",
+  "uptime_since": "2026-03-06T07:07:59Z",
+  "last_poll": "2026-03-06T07:08:29Z",
+  "nodes_total": 17,
+  "nodes_online": 10,
+  "poll_count": 2,
+  "mqtt_connected": true
+}
+```
+
+Add `HEALTH_PORT=8099` to your `.env` to change the port.
