@@ -172,3 +172,81 @@ Returns:
 ```
 
 Add `HEALTH_PORT=8099` to your `.env` to change the port.
+
+## State Persistence
+
+The exporter saves node online timestamps to `/app/data/node_state.json` so that connection durations survive container restarts.
+
+The `data/` directory is mounted as a volume in `docker-compose.yml`:
+```yaml
+cat >> /headscale/headscale-ha-exporter/README.md << 'EOF'
+
+## State Persistence
+
+The exporter saves node online timestamps to `/app/data/node_state.json` so that connection durations survive container restarts.
+
+The `data/` directory is mounted as a volume in `docker-compose.yml`:
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+This means:
+- ✅ Container restarts preserve `connected_since` timestamps
+- ✅ `status_info` attribute shows correct `Up Xh Xm` after restart
+- ✅ State is saved once per poll cycle
+
+The `data/` directory is created automatically on first run.
+
+## Attributes Reference
+
+Each `binary_sensor.headscale_<nodename>` entity exposes the following attributes:
+
+| Attribute | Description | Example |
+|---|---|---|
+| `hostname` | Machine hostname | `macbookpro` |
+| `user` | Headscale user display name | `Riaan Grobler` |
+| `group` | Group from `USER_GROUPS` mapping | `Admin` |
+| `last_seen` | ISO timestamp of last seen | `2026-03-06T07:00:00Z` |
+| `last_seen_ago` | Human readable last seen | `5m ago` |
+| `status_info` | Up duration or last seen ago | `Up 2h 30m` or `1d 2h ago` |
+| `tailnet_ip` | First IPv4 tailnet address | `100.64.0.4` |
+| `ip_addresses` | All IP addresses | `100.64.0.4, fd7a::4` |
+| `approved_routes` | Advertised subnet routes | `192.168.1.0/24` |
+| `connected_since` | ISO timestamp of when node came online | `2026-03-06T07:00:00Z` |
+| `connected_duration` | How long node has been online | `2h 30m` |
+
+## State Persistence
+
+The exporter saves node online timestamps to `/app/data/node_state.json` so that connection durations survive container restarts.
+
+The `data/` directory is mounted as a volume in `docker-compose.yml`:
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+This means:
+- ✅ Container restarts preserve `connected_since` timestamps
+- ✅ `status_info` attribute shows correct `Up Xh Xm` after restart
+- ✅ State is saved once per poll cycle
+
+The `data/` directory is created automatically on first run.
+
+## Attributes Reference
+
+Each `binary_sensor.headscale_<nodename>` entity exposes the following attributes:
+
+| Attribute | Description | Example |
+|---|---|---|
+| `hostname` | Machine hostname | `macbookpro` |
+| `user` | Headscale user display name | `Riaan Grobler` |
+| `group` | Group from `USER_GROUPS` mapping | `Admin` |
+| `last_seen` | ISO timestamp of last seen | `2026-03-06T07:00:00Z` |
+| `last_seen_ago` | Human readable last seen | `5m ago` |
+| `status_info` | Up duration or last seen ago | `Up 2h 30m` or `1d 2h ago` |
+| `tailnet_ip` | First IPv4 tailnet address | `100.64.0.4` |
+| `ip_addresses` | All IP addresses | `100.64.0.4, fd7a::4` |
+| `approved_routes` | Advertised subnet routes | `192.168.1.0/24` |
+| `connected_since` | ISO timestamp of when node came online | `2026-03-06T07:00:00Z` |
+| `connected_duration` | How long node has been online | `2h 30m` |
