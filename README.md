@@ -1,6 +1,6 @@
 # Headscale Home Assistant Exporter
 
-![Version](https://img.shields.io/badge/version-0.1.0--beta-blue)
+![Version](https://img.shields.io/badge/version-0.2.0--beta-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A lightweight Docker-based exporter that polls the [Headscale](https://github.com/juanfont/headscale) API and publishes node status to Home Assistant via MQTT Discovery.

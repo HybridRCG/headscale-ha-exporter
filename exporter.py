@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 sys.stdout.reconfigure(line_buffering=True)
 
+VERSION = "0.2.0-beta"
+
 HEADSCALE_API_URL = os.environ.get("HEADSCALE_API_URL")
 HEADSCALE_API_KEY = os.environ.get("HEADSCALE_API_KEY")
 MQTT_BROKER = os.environ.get("MQTT_BROKER")
@@ -18,14 +20,17 @@ MQTT_USER = os.environ.get("MQTT_USER")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 30))
 
+# Load group mappings from environment
+USER_GROUPS = json.loads(os.environ.get("USER_GROUPS", "{}"))
+
 DISCOVERY_PREFIX = "homeassistant"
 DEVICE_PREFIX = "headscale"
 
-VERSION = "0.1.0-beta"
 print(f"Starting Headscale HA Exporter v{VERSION}")
 print(f"API URL: {HEADSCALE_API_URL}")
 print(f"MQTT: {MQTT_BROKER}:{MQTT_PORT}")
 print(f"Poll interval: {POLL_INTERVAL}s")
+print(f"User groups loaded: {len(USER_GROUPS)} mappings")
 
 client = mqtt.Client()
 if MQTT_USER:
@@ -103,12 +108,15 @@ def publish_state(node, state_topic, attr_topic):
     name = node.get("givenName")
     online = node.get("online", False)
     last_seen = node.get("lastSeen", "")
+    user = node.get("user", {}).get("displayName") or node.get("user", {}).get("name")
+    group = USER_GROUPS.get(user, "Other")
 
     client.publish(state_topic, "online" if online else "offline", retain=True)
 
     attrs = {
         "hostname": node.get("name"),
-        "user": node.get("user", {}).get("displayName") or node.get("user", {}).get("name"),
+        "user": user,
+        "group": group,
         "last_seen": last_seen,
         "last_seen_ago": time_ago(last_seen) if last_seen else "unknown",
         "tailnet_ip": node.get("ipAddresses", [""])[0],
@@ -116,7 +124,7 @@ def publish_state(node, state_topic, attr_topic):
         "approved_routes": node.get("approvedRoutes", []),
     }
     client.publish(attr_topic, json.dumps(attrs), retain=True)
-    print(f"  - {name} ({'online' if online else 'offline'}) last seen: {attrs['last_seen_ago']}")
+    print(f"  - {name} ({'online' if online else 'offline'}) [{group}]")
 
 # Publish discovery configs
 print("Publishing MQTT discovery configs...")
