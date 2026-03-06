@@ -27,9 +27,26 @@ USER_GROUPS = json.loads(os.environ.get("USER_GROUPS", "{}"))
 
 DISCOVERY_PREFIX = "homeassistant"
 DEVICE_PREFIX = "headscale"
+STATE_FILE = "/app/data/node_state.json"
 
-node_online_since = {}
+def load_state():
+    try:
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_state():
+    try:
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(node_online_since, f)
+    except Exception as e:
+        print(f"Failed to save state: {e}")
+
+node_online_since = load_state()
 node_previous_state = {}
+
 stats = {
     "start_time": datetime.now(timezone.utc).isoformat(),
     "last_poll": None,
@@ -45,6 +62,7 @@ print(f"MQTT: {MQTT_BROKER}:{MQTT_PORT}")
 print(f"Poll interval: {POLL_INTERVAL}s")
 print(f"Health check port: {HEALTH_PORT}")
 print(f"User groups loaded: {len(USER_GROUPS)} mappings")
+print(f"Loaded {len(node_online_since)} node states from disk")
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -133,8 +151,7 @@ def time_ago(timestamp_str):
     try:
         ts = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        diff = now - ts
-        seconds = int(diff.total_seconds())
+        seconds = int((now - ts).total_seconds())
         if seconds < 60:
             return f"{seconds}s ago"
         elif seconds < 3600:
@@ -211,6 +228,13 @@ def publish_state(node, state_topic, attr_topic):
     connected_since = node_online_since.get(name)
     connected_duration = duration_since(connected_since) if connected_since else None
 
+    if online and connected_duration:
+        status_info = f"Up {connected_duration}"
+    elif online:
+        status_info = "just now"
+    else:
+        status_info = time_ago(last_seen) if last_seen else "unknown"
+
     client.publish(state_topic, "online" if online else "offline", retain=True)
 
     attrs = {
@@ -219,6 +243,7 @@ def publish_state(node, state_topic, attr_topic):
         "group": group,
         "last_seen": last_seen,
         "last_seen_ago": time_ago(last_seen) if last_seen else "unknown",
+        "status_info": status_info,
         "tailnet_ip": node.get("ipAddresses", [""])[0],
         "ip_addresses": node.get("ipAddresses", []),
         "approved_routes": node.get("approvedRoutes", []),
@@ -226,16 +251,15 @@ def publish_state(node, state_topic, attr_topic):
         "connected_duration": connected_duration,
     }
     client.publish(attr_topic, json.dumps(attrs), retain=True)
-    duration_str = f" | connected {connected_duration}" if connected_duration else ""
-    print(f"  - {name} ({'online' if online else 'offline'}) [{group}]{duration_str}")
+    duration_str = f" | {status_info}" if online else f" | {status_info}"
+    print(f"  - {name} ({'online' if online else 'offline'}) [{group}] | {status_info}")
 
 print("Publishing MQTT discovery configs...")
 nodes = fetch_nodes()
 for node in nodes:
     publish_discovery(node)
-    # On startup, seed online_since for already-online nodes
     name = node.get("givenName")
-    if node.get("online"):
+    if node.get("online") and name not in node_online_since:
         node_online_since[name] = stats["start_time"]
         node_previous_state[name] = True
     else:
@@ -254,6 +278,7 @@ while True:
         for node in nodes:
             state_topic, attr_topic = publish_discovery(node)
             publish_state(node, state_topic, attr_topic)
+        save_state()
     else:
         print("No nodes fetched")
     time.sleep(POLL_INTERVAL)

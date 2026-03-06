@@ -6,6 +6,10 @@ services:
     restart: always
     environment:
       PYTHONUNBUFFERED: "1"
+    ports:
+      - "8099:8080"
+    volumes:
+      - ./data:/app/data
     networks:
       - headscale_network
     env_file:
