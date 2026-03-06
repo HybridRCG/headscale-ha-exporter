@@ -259,10 +259,14 @@ nodes = fetch_nodes()
 for node in nodes:
     publish_discovery(node)
     name = node.get("givenName")
-    if node.get("online") and name not in node_online_since:
-        node_online_since[name] = stats["start_time"]
+    if node.get("online"):
+        # Only seed if not already in persisted state
+        if name not in node_online_since:
+            node_online_since[name] = stats["start_time"]
         node_previous_state[name] = True
     else:
+        # Node offline - clear any stale state
+        node_online_since.pop(name, None)
         node_previous_state[name] = False
 print(f"Discovery published for {len(nodes)} nodes")
 
