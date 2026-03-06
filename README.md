@@ -11,6 +11,7 @@ A lightweight Docker-based exporter that polls the [Headscale](https://github.co
 - 📡 Auto-discovery in Home Assistant — no manual entity configuration
 - 🕐 Human-readable "last seen" timestamps (e.g. `5m ago`, `2d 3h ago`)
 - 👤 User, Tailnet IP, and approved routes per node
+- 👥 Group mapping — assign nodes to groups for filtered dashboard cards
 - 🔄 Configurable poll interval
 - 🔒 Connects to Headscale internally via Docker network
 
@@ -26,13 +27,18 @@ Headscale API → exporter.py → MQTT Broker → Home Assistant
 ```
 
 Each node becomes a `binary_sensor` in Home Assistant with the following attributes:
-- `online` — true/false
-- `last_seen` — ISO timestamp
-- `last_seen_ago` — human readable
-- `tailnet_ip` — first IPv4 address
-- `ip_addresses` — all IPs
-- `user` — Headscale user display name
-- `approved_routes` — advertised subnet routes
+
+| Attribute | Description |
+|---|---|
+| `online` | true/false |
+| `last_seen` | ISO timestamp |
+| `last_seen_ago` | Human readable e.g. `5m ago` |
+| `tailnet_ip` | First IPv4 tailnet address |
+| `ip_addresses` | All IP addresses |
+| `user` | Headscale user display name |
+| `group` | Group assigned via `USER_GROUPS` mapping |
+| `approved_routes` | Advertised subnet routes |
+| `hostname` | Machine hostname |
 
 ## Installation
 
@@ -59,15 +65,25 @@ Fill in your values:
 | `MQTT_USER` | MQTT username |
 | `MQTT_PASSWORD` | MQTT password |
 | `POLL_INTERVAL` | Poll interval in seconds (default: `30`) |
+| `USER_GROUPS` | JSON mapping of user display names to group names |
 
-### 3. Configure Docker network
+### 3. Configure group mappings
+
+The `USER_GROUPS` environment variable maps Headscale user display names to group names. This adds a `group` attribute to each node entity in Home Assistant, allowing you to create filtered dashboard cards per group.
+```bash
+USER_GROUPS={"Marius Viljoen":"MVSolar","Rika Viljoen":"MVSolar","Riaan Grobler":"Admin"}
+```
+
+Any user not in the mapping will be assigned the group `Other`.
+
+### 4. Configure Docker network
 
 The exporter needs to be on the same Docker network as Headscale. Update `docker-compose.yml` with your Headscale network name:
 ```yaml
 networks:
   headscale_network:
     external: true
-    name: your_headscale_network_name
+    name: headscale_headscale_default
 ```
 
 To find your Headscale network name:
@@ -75,7 +91,7 @@ To find your Headscale network name:
 docker network ls | grep headscale
 ```
 
-### 4. Build and run
+### 5. Build and run
 ```bash
 docker compose build
 docker compose up -d
@@ -89,23 +105,6 @@ Once running, entities will auto-discover in Home Assistant under:
 **Settings → Devices & Services → MQTT → Devices → Headscale Nodes**
 
 Each node appears as `binary_sensor.headscale_<nodename>`.
-
-## Dashboard
-
-A ready-made Lovelace dashboard card is available in [DASHBOARD.md](DASHBOARD.md) showing:
-- Online/Offline/Total summary
-- Filter buttons (All / Online / Offline)
-- Sortable node table
-
-### Required HACS Cards
-- [flex-table-card](https://github.com/custom-cards/flex-table-card)
-- [auto-entities](https://github.com/iantrich/config-template-card)
-- [button-card](https://github.com/custom-cards/button-card)
-- [state-switch](https://github.com/thomasloven/lovelace-state-switch)
-
-## License
-
-MIT
 
 ## Headscale ACL Configuration
 
@@ -132,3 +131,21 @@ headscale nodes list
 ```
 
 This is more secure than exposing MQTT port 1883 directly to the internet — all traffic stays encrypted within the Tailnet.
+
+## Dashboard
+
+A ready-made Lovelace dashboard card is available in [DASHBOARD.md](DASHBOARD.md) showing:
+- Online/Offline/Total summary
+- Filter buttons (All / Online / Offline)
+- Sortable node table
+- Group filtered cards (MVSolar, Dyna, IT & Admin)
+
+### Required HACS Cards
+- [flex-table-card](https://github.com/custom-cards/flex-table-card)
+- [auto-entities](https://github.com/iantrich/config-template-card)
+- [button-card](https://github.com/custom-cards/button-card)
+- [state-switch](https://github.com/thomasloven/lovelace-state-switch)
+
+## License
+
+MIT
