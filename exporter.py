@@ -268,6 +268,54 @@ for node in nodes:
         # Node offline - clear any stale state
         node_online_since.pop(name, None)
         node_previous_state[name] = False
+
+def publish_group_discovery(group_name):
+    group_id = f"{DEVICE_PREFIX}_group_{group_name.lower().replace(' ', '_')}"
+    discovery_prefix = f"{DISCOVERY_PREFIX}/sensor/{group_id}"
+    device = {
+        "identifiers": [f"{DEVICE_PREFIX}_groups"],
+        "name": "Headscale Groups",
+        "manufacturer": "Headscale",
+        "model": "Group Summary"
+    }
+    for metric, icon in [("online", "mdi:check-network"), ("offline", "mdi:network-off"), ("total", "mdi:devices")]:
+        topic = f"{discovery_prefix}_{metric}/config"
+        payload = {
+            "name": f"{group_name} {metric.capitalize()}",
+            "unique_id": f"{group_id}_{metric}",
+            "object_id": f"{group_id}_{metric}",
+            "state_topic": f"{DEVICE_PREFIX}/groups/{group_name}/state",
+            "value_template": f"{{{{ value_json.{metric} }}}}",
+            "json_attributes_topic": f"{DEVICE_PREFIX}/groups/{group_name}/state",
+            "icon": icon,
+            "device": device,
+        }
+        client.publish(topic, json.dumps(payload), retain=True)
+
+def publish_group_summaries(nodes):
+    groups = {}
+    for node in nodes:
+        user = node.get("user", {}).get("displayName") or node.get("user", {}).get("name")
+        group = USER_GROUPS.get(user, "Other")
+        if group not in groups:
+            groups[group] = {"online": [], "offline": []}
+        name = node.get("givenName")
+        if node.get("online"):
+            groups[group]["online"].append(name)
+        else:
+            groups[group]["offline"].append(name)
+    for group, data in groups.items():
+        publish_group_discovery(group)
+        payload = {
+            "online": len(data["online"]),
+            "offline": len(data["offline"]),
+            "total": len(data["online"]) + len(data["offline"]),
+            "online_nodes": ", ".join(data["online"]) or "none",
+            "offline_nodes": ", ".join(data["offline"]) or "none",
+        }
+        client.publish(f"{DEVICE_PREFIX}/groups/{group}/state", json.dumps(payload), retain=True)
+        print(f"  [Group] {group}: {payload['online']}/{payload['total']} online")
+
 print(f"Discovery published for {len(nodes)} nodes")
 
 while True:
@@ -282,6 +330,10 @@ while True:
         for node in nodes:
             state_topic, attr_topic = publish_discovery(node)
             publish_state(node, state_topic, attr_topic)
+        try:
+            publish_group_summaries(nodes)
+        except Exception as e:
+            print(f"Group summary error: {e}")
         save_state()
     else:
         print("No nodes fetched")
